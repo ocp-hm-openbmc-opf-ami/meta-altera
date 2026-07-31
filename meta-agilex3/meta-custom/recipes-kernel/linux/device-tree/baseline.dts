@@ -1,0 +1,260 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Copyright (C) 2025, Altera Corporation
+ */
+/dts-v1/;
+#include "socfpga_agilex3_socdk.dts"
+
+
+/ {
+
+    /*
+     * Fixed 100 MHz clock fed to the ADI AXI fan controller.
+     * The kernel driver uses clk_get_rate() to compute PWM period and RPM.
+     * Must match CLK_FREQUENCY = 100_000_000 hard-coded in axi_fan_control.v.
+     */
+    fan_ctrl_clk: fan-ctrl-clk {
+        compatible = "fixed-clock";
+        #clock-cells = <0>;
+        clock-frequency = <100000000>;
+    };
+
+    soc@0 {
+
+        /*
+         * ADI AXI fan controller (real IP from Shi Lin's branch).
+         *
+         * Address: LWH2F base 0x20000000 + offset 0x0 = 0x20000000
+         *   Derived from fabric_subsys.qsys address map where fan_control.s_axi
+         *   starts at offset 0x0, and fabric_subsys base = 0x20010060 - 0x10060.
+         *
+         * IRQ: fabric_subsys.fan_irq -> u_shell_subsys.f2h_irq0_in -> GIC SPI 18.
+         *   Wired inside baseline_top.qsys; confirmed via connection XML.
+         *
+         * temp_in[9:0]: Currently tied to 0 in baseline.sv (placeholder).
+         *   With temp_in=0 the IP sets pwm_width_req=0 (0% duty cycle).
+         *   A future PIO IP will allow HPS to drive this for automatic thermal
+         *   control.  For now, PWM can be overridden via devmem writes to the
+         *   PWM_WIDTH register (0x20000084) for one FSM cycle at a time.
+         *
+         * devmem test:
+         *   devmem 0x20000000 32   # read VERSION  -> should return 0x00010061
+         *   devmem 0x2000000C 32   # read MAGIC    -> should return 0x46414E43
+         *   devmem 0x200000C8 32   # read TEMPERATURE (sysmone_temp register)
+         */
+        axi_fan_control: axi-fan-control@20000000 {
+            compatible = "adi,axi-fan-control-1.00.a";
+            reg = <0x20000000 0x10000>;
+            clocks = <&fan_ctrl_clk>;
+            interrupt-parent = <&intc>;
+            interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
+            pulses-per-revolution = <2>;
+        };
+    };
+};
+
+/*
+ * Step 1 / Step 4 — MikroE Click sensors on the Pi 2 Click Shield, on HPS I3C0
+ * (i3c@10da0000). Per baseline.qsf the Pi-header sensor SDA/SCL balls
+ * (AJ24/AJ23) are wired to the HPS I3C controller (i3c_sda/i3c_scl), not a
+ * DesignWare I2C controller. Both Click parts (Thermo 10 / P3T1755 and
+ * Current 12 / TSC1641) are dual I2C/I3C devices and are used as native I3C on
+ * this bus. See the &i3c0 node below for the per-part status and why legacy-I2C
+ * does not work on this controller.
+ *
+ * The altera-sensor-board shunts are 0.1 ohm (100000 uOhm) on both the VH and
+ * VFAN rails (schematic R1/R2). The tsc1641 driver defaults to 1000 uOhm, so
+ * each I3C tsc1641 binding must set shunt-resistor-micro-ohms = <100000> or
+ * current / power read ~100x high.
+ */
+&i3c0 {
+    status = "okay";
+    #address-cells = <3>;
+    #size-cells = <0>;
+
+    /*
+     * Bus timing — slow the open-drain / DAA phase for a marginal bus. The
+     * SDA pull-up here is the FPGA's weak / emulated pull-up (the board's
+     * dedicated I3C_PU resistor is left disabled in the bitstream), so the
+     * open-drain rise is slow. i2c-scl-hz sets the open-drain (legacy/DAA)
+     * clock — the phase where address assignment happens and where a slow
+     * SDA rise makes devices miss enumeration; i3c-scl-hz sets the SDR
+     * push-pull clock. Lowering both widens the bit period so SDA settles
+     * before SCL samples. Conservative values for bring-up.
+     */
+    i2c-scl-hz = <100000>;
+    i3c-scl-hz = <2000000>;
+
+    /*
+     * Both Click parts are dual I2C/I3C devices, used here as NATIVE I3C.
+     * Legacy-I2C on this bus does NOT work: the Synopsys DesignWare I3C master
+     * cannot mix legacy-I2C and native-I3C devices on the same bus, so once an
+     * I3C device has enumerated any legacy-I2C transfer is rejected by the
+     * controller with -EINVAL (dw_i3c_master_get_addr_pos: address not in the
+     * device table). So neither part is declared as a legacy-I2C child.
+     *
+     * Thermo 10 (NXP P3T1755) self-enumerates via DAA (bound by lm75_i3c,
+     * e.g. "0-236152a0090") and is surfaced to D-Bus by the p3t1755-temp-bridge
+     * daemon (reads its hwmon, publishes the "Board_Temp" ExternalSensor for
+     * Redfish / phosphor-pid-control). It needs no node here: lm75_i3c carries
+     * no per-device DT property we have to set.
+     */
+
+    /*
+     * Altera sensor board carries TWO ST TSC1641 16-bit power monitors, one per
+     * rail (see altera-sensor-board schematic). They are matched by the tsc1641
+     * i3c driver on their MIPI PID (manuf 0x0104 ST, part 0x020A); the static I2C
+     * address is set by the ADDR (A1/A0) strap.
+     *   reg = <static_addr  PID[47:32]  PID[31:0]>
+     * Each node passes shunt-resistor-micro-ohms = 100000 (the 0.1 ohm R1/R2
+     * shunts); the driver otherwise defaults to 1 mOhm and current / power read
+     * ~100x high. The tsc1641-current-bridge daemon tells the two apart by the
+     * I3C address embedded in the sysfs device path and publishes Heater_* and
+     * Fan_* sensors.
+     *
+     * assigned-address = static addr -> the i3c core pre-assigns the dynamic
+     * address with SETDASA at bus init (drivers/i3c/master.c: assigned-address ->
+     * init_dyn_addr -> i3c_master_early_i3c_dev_add -> i3c_master_setdasa_locked),
+     * instead of leaving the part to ENTDAA. This is a deliberate workaround for a
+     * sensor-board signal-integrity issue: during ENTDAA the TSC1641 must drive
+     * its 48-bit PID in open-drain, and on this branch (10K pull-ups sit at the
+     * P3T1755, long stub to the TSC1641s) those target-driven rising edges are
+     * marginal, so the controller misreads the PID and the part is not detected
+     * unless a scope probe is attached. SETDASA has the controller drive the
+     * static address while the TSC1641 only has to ACK (pull SDA low), after which
+     * it switches to push-pull -- avoiding the flaky target-driven open-drain DAA.
+     * The P3T1755 has no assigned-address and still enumerates via ENTDAA (it sits
+     * right at the pull-ups and is reliable). See the TSC1641 datasheet (DS14338)
+     * sec 5.2.1/5.2.3 and Table 11 (SETDASA) for the static-addr/PID and CCC support.
+     */
+
+    /* U3 — VH (heater) rail, ADDR strap 1000010 = static 0x42 -> 0-208020a2001 */
+    tsc1641@42,208020a2001 {
+        reg = <0x42 0x0208 0x020a2001>;
+        assigned-address = <0x42>;	/* force SETDASA, skip ENTDAA */
+        shunt-resistor-micro-ohms = <100000>;
+    };
+
+    /* U8 — VFAN (fan) rail, ADDR strap 1000011 = static 0x43 -> 0-208020a3001 */
+    tsc1641@43,208020a3001 {
+        reg = <0x43 0x0208 0x020a3001>;
+        assigned-address = <0x43>;	/* force SETDASA, skip ENTDAA */
+        shunt-resistor-micro-ohms = <100000>;
+    };
+
+    /*
+     * TEST (TEMPORARY) — prove this kernel honors assigned-address / SETDASA,
+     * using the single P3T1755 (which normally enumerates via ENTDAA). With
+     * CONFIG_DYNAMIC_DEBUG=y, on the next boot run i3c-reinit and read dmesg:
+     *   - SETDASA CCC to 0x48 + sensor appears  => kernel honors it, addr OK.
+     *   - SETDASA NACK                          => honors it; fix the static
+     *                                              addr (Thermo 10 ADDR strap,
+     *                                              P3T1755 range 0x48-0x4F).
+     *   - no SETDASA, device via ENTDAA         => kernel IGNORES assigned-address
+     *                                              (the real blocker to escalate).
+     * 0x48 is the P3T1755 default; confirm against the Thermo 10 datasheet/strap.
+     * lm75_i3c still binds by PID, so Board_Temp keeps working either way.
+     * REMOVE this node once the assigned-address path is validated.
+     */
+    p3t1755@48,236152a0090 {
+        reg = <0x48 0x0236 0x152a0090>;
+        assigned-address = <0x48>;	/* force SETDASA, skip ENTDAA (TEST) */
+    };
+};
+
+/*
+ * Step 5 (D5) — MikroE Accel 23 Click (MIKROE-6664), ST IIS2DULPX 3-axis
+ * accelerometer. Unlike the Thermo 10 / Current 12 Click parts (which sit on
+ * the I3C0 legacy-I2C bus), the accelerometer is wired to the HPS SPI master.
+ * From the GHRD HPS IP (ip/hps_subsys/agilex_hps.ip: SPIM0_PinMuxing = "FPGA",
+ * SPIM0_Mode = "Single_slave_selects"; SPIM1 unused) and the Altera sensor-
+ * board interface table, SPIM0 is routed through the FPGA fabric to:
+ *     ACC_SDA/SDI = AJ22 -> spim0_mosi   (Pi MOSI / GPIO10)
+ *     ACC_SA0/SDO = AH20 -> spim0_miso   (Pi MISO / GPIO9)
+ *     ACC_SCL/SPC = AJ20 -> spim0_sclk   (Pi SCK  / GPIO11)
+ *     ACC_CS#     = AG23 -> spim0_ss0_n  (Pi CE0  / GPIO8)
+ *     ACC_INT     = AH23 -> (Pi INT1 / GPIO6) accelerometer interrupt
+ * SPIM0 is the DesignWare snps,dw-apb-ssi controller "spi0" at 0x10da4000.
+ *
+ * There is no in-tree IIS2DULPX kernel driver (the ST IIO driver only exists
+ * out-of-tree / in much newer kernels), so we expose the raw SPI slave to
+ * userspace via spidev and read it from the iis2dulpx-accel daemon. Modern
+ * spidev only binds nodes whose compatible is on its allow-list, so we use the
+ * generic "rohm,dh2228fv" entry (present in this kernel's spidev_dt_ids) to get
+ * /dev/spidev0.0 without patching the kernel. The "real" part is identified and
+ * configured by the daemon (WHO_AM_I = 0x47), not by the DT compatible.
+ *
+ * IIS2DULPX SPI: 4-wire, up to 10 MHz, SPI mode 3 (CPOL=1, CPHA=1). CS is the
+ * controller's hardware SS0 (single-slave-select mode), so reg = <0>.
+ */
+&spi0 {
+    status = "okay";
+    #address-cells = <1>;
+    #size-cells = <0>;
+
+    /* MikroE Accel 23 Click (ST IIS2DULPX) on SPIM0 chip-select 0, via spidev */
+    accel@0 {
+        compatible = "rohm,dh2228fv";
+        reg = <0>;
+        spi-max-frequency = <5000000>;
+    };
+};
+
+/*
+ * Step 5 (D5) — Pi-header UART for the Altera sensor board's QT Py.
+ * The upcoming Altera OpenBMC sensor board carries a QT Py MCU that reads the
+ * potentiometer/heater and streams telemetry over UART; a userspace UART<->D-Bus
+ * bridge on the BMC will surface it (heater PowerWatts/SetpointC, knob).
+ *
+ * GHRD HPS IP (ip/hps_subsys/agilex_hps.ip): UART0_PinMuxing = "IO" (dedicated
+ * HPS console pins -> ttyS0, the boot console), UART1_PinMuxing = "FPGA" -> the
+ * controller is routed through the fabric to the Pi-header UART balls:
+ *     Host_TX = AF24  (Pi pin 8,  GPIO14/TXD0)
+ *     Host_RX = AG24  (Pi pin 10, GPIO15/RXD0)
+ * UART1 is the DesignWare snps,dw-apb-uart "uart1" at 0x10c02100. It ships
+ * disabled in socfpga_agilex3.dtsi, so enable it here and pin it to ttyS1 via a
+ * serial1 alias (ttyS0 stays the console). 3.3 V logic — safe to wire directly
+ * to a Raspberry Pi / QT Py UART (TX<->RX crossover + common GND, no 5 V).
+ */
+/ {
+    aliases {
+        serial1 = &uart1;
+    };
+};
+
+&uart1 {
+    status = "okay";
+};
+
+/*
+ * FUTURE (Altera sensor board — replaces the MikroE Pi 2 Click Shield).
+ * See docs/altera-sensor-board-schematic.png and NOTES.md "Altera Sensor Board".
+ *
+ * (1) HAT ID EEPROM — CAT24C32 @ 0x50 on the Pi ID_SD/ID_SC pins. The GHRD
+ *     routes these to HPS *I2C1* (ip/hps_subsys/agilex_hps.ip: I2C1_PinMuxing =
+ *     "FPGA"; baseline.sv u_id_sda/u_id_sc drive id_sd/id_sc from
+ *     hps_i2c1_*). I2C1 = i2c@10c02900. Not populated on the current Pi-shield
+ *     setup. Enabled below (also add CONFIG_EEPROM_AT24=y to the kernel
+ *     config). entity-manager's fru-device auto-reads a valid IPMI FRU at 0x50
+ *     and surfaces the board identity in inventory / Redfish.
+ *
+ * (2) Two on-board current monitors — ST TSC1641 @ 0x42 (heater, VH rail) and
+ *     @ 0x43 (fan, VFAN rail). These need NO DTS change: they sit on the same
+ *     I3C0 legacy-I2C bus (i2c-1) as today's Current 12 Click and are a
+ *     dbus-sensors/entity-manager change only. Ready-to-paste entity-config.json
+ *     entries + the shunt-resistor caveat are in NOTES.md (JSON can't hold
+ *     comments, so the staged config lives there).
+ */
+
+/* Altera sensor board HAT ID EEPROM (CAT24C32 @ 0x50) on HPS I2C1 (id_sd/id_sc).
+ * fru-device reads a valid IPMI FRU here and publishes board inventory. */
+&i2c1 {
+    status = "okay";
+    clock-frequency = <100000>;
+
+    eeprom@50 {
+        compatible = "atmel,24c32";
+        reg = <0x50>;
+        pagesize = <32>;
+    };
+};

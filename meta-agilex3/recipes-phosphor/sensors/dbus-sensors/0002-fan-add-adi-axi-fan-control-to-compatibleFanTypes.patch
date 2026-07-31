@@ -1,0 +1,34 @@
+From: Altera Fan Control Demo <altera@example.com>
+Date: Mon, 26 May 2026 00:00:00 +0000
+Subject: [PATCH] fan: add adi,axi-fan-control-1.00.a to compatibleFanTypes
+
+Map the ADI AXI fan control IP compatible string to FanTypes::aspeed so
+that the fansensor daemon probes and publishes hwmon data (fan1_input,
+pwm1, temp1_input) from the adi,axi-fan-control-1.00.a platform device
+on Agilex 5 BMC demo boards.
+
+The ADI AXI fan controller (axi_fan_control.v from AnalogDevices HDL)
+exposes standard hwmon sysfs attributes compatible with the aspeed layout
+(fan1_input in RPM, pwm1 duty cycle 0-255) expected by dbus-sensors
+fansensor.
+
+Upstream-Status: Pending
+---
+ src/fan/FanMain.cpp | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/src/fan/FanMain.cpp b/src/fan/FanMain.cpp
+index 0000001..0000002 100644
+--- a/src/fan/FanMain.cpp
++++ b/src/fan/FanMain.cpp
+@@ -84,7 +84,9 @@
+     {"aspeed,ast2700-pwm-tach", FanTypes::aspeed},
+     {"nuvoton,npcm750-pwm-fan", FanTypes::nuvoton},
+     {"nuvoton,npcm845-pwm-fan", FanTypes::nuvoton},
+-    {"hpe,gxp-fan-ctrl", FanTypes::hpe}
++    {"hpe,gxp-fan-ctrl", FanTypes::hpe},
++    // Altera Agilex 5 fan control (adi,axi-fan-control-1.00.a driver)
++    {"adi,axi-fan-control-1.00.a", FanTypes::aspeed}
+     // add compatible string here for new fan type
+ };
+ 

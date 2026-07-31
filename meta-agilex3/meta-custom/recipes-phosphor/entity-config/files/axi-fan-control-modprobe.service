@@ -1,0 +1,19 @@
+[Unit]
+Description=Load ADI AXI fan control hwmon driver (axi-fan-control)
+# This image's systemd is built without systemd-modules-load, so neither
+# KERNEL_MODULE_AUTOLOAD nor /etc/modules-load.d/*.conf are ever processed.
+# Load the module explicitly and order it before fansensor so the fan hwmon
+# (fan1_input/pwm1) exists by the time fansensor scans for fans.
+DefaultDependencies=no
+After=sysinit.target
+Before=xyz.openbmc_project.fansensor.service
+Conflicts=shutdown.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# Use a shell so PATH resolves modprobe regardless of provider (busybox vs kmod).
+ExecStart=/bin/sh -c 'modprobe axi-fan-control'
+
+[Install]
+WantedBy=multi-user.target

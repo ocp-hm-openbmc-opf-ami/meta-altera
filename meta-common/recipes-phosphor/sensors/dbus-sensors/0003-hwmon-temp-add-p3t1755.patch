@@ -1,0 +1,24 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Altera BMC <openbmc@altera.com>
+Date: Thu, 30 Jul 2026 03:24:40 +0000
+Subject: [PATCH 3/4] hwmon-temp: add P3T1755 temperature sensor
+
+---
+ src/hwmon-temp/HwmonTempMain.cpp | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/hwmon-temp/HwmonTempMain.cpp b/src/hwmon-temp/HwmonTempMain.cpp
+index e687694..94c0187 100644
+--- a/src/hwmon-temp/HwmonTempMain.cpp
++++ b/src/hwmon-temp/HwmonTempMain.cpp
+@@ -87,6 +87,7 @@ static const I2CDeviceTypeMap sensorTypes{
+     {"NCT7802", I2CDeviceType{"nct7802", true}},
+     {"PT5161L", I2CDeviceType{"pt5161l", true}},
+     {"SBTSI", I2CDeviceType{"sbtsi", true}},
++    {"P3T1755", I2CDeviceType{"p3t1755", true}},
+     {"SBRMI", I2CDeviceType{"sbrmi", true}},
+     {"SOC64Hwmon", I2CDeviceType{"soc64hwmon", false}},
+     {"SI7020", I2CDeviceType{"si7020", false}},
+-- 
+2.34.1
+

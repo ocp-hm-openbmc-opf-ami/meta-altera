@@ -1,0 +1,74 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Marvin Drees <marvin.drees@9elements.com>
+Date: Mon, 20 Apr 2026 12:00:00 +0000
+Subject: [PATCH] hwmon-temp: support soc64-hwmon platform device
+
+The Intel soc64-hwmon driver exposes Agilex 5 SDM voltage and
+temperature sensors via ATF SMC calls. It registers as a platform
+device, not an I2C device, so getDeviceBusAddr() returns false for
+its canonical sysfs path and hwmontempsensor silently skips it.
+
+To allow entity-manager configs to match soc64-hwmon:
+
+1. Add a "SOC64Hwmon" entry to sensorTypes so the configuration
+   daemon's type filter includes it.
+
+2. When getDeviceBusAddr() fails, read the hwmon "name" file from the
+   same directory. If it reads "soc64hwmon" assign sentinel values
+   Bus=65535 / Address=0 (matching the corresponding entity-manager
+   JSON Exposes block) and continue scanning. Any other hwmon device
+   that fails getDeviceBusAddr() still hits continue as before.
+
+3. Add #include <fstream> required for std::ifstream.
+
+Upstream-Status: Pending
+Signed-off-by: Marvin Drees <marvin.drees@9elements.com>
+---
+ src/hwmon-temp/HwmonTempMain.cpp | 17 +++++++++++++++++-
+ 1 file changed, 17 insertions(+), 1 deletion(-)
+
+diff --git a/src/hwmon-temp/HwmonTempMain.cpp b/src/hwmon-temp/HwmonTempMain.cpp
+index 5a9d982..df90d6d 100644
+--- a/src/hwmon-temp/HwmonTempMain.cpp
++++ b/src/hwmon-temp/HwmonTempMain.cpp
+@@ -41,6 +41,7 @@
+ #include <cstddef>
+ #include <cstdint>
+ #include <filesystem>
++#include <fstream>
+ #include <functional>
+ #include <ios>
+ #include <iostream>
+@@ -99,6 +100,7 @@ static const I2CDeviceTypeMap sensorTypes{
+     {"TMP468", I2CDeviceType{"tmp468", true}},
+     {"TMP75", I2CDeviceType{"tmp75", true}},
+     {"W83773G", I2CDeviceType{"w83773g", true}},
++    {"SOC64Hwmon", I2CDeviceType{"soc64hwmon", false}},
+ };
+ 
+ static struct SensorParams getSensorParameters(
+@@ -342,7 +344,21 @@ void createSensors(
+                 uint64_t addr = 0;
+                 if (!getDeviceBusAddr(deviceName, bus, addr))
+                 {
+-                    continue;
++                    // Platform hwmon devices have no I2C bus/addr in
++                    // their canonical device path. The soc64-hwmon SDM
++                    // sensor is one such device. Identify it by name
++                    // and use sentinel Bus=65535/Address=0 so that
++                    // entity-manager configs with the same sentinel match.
++                    std::ifstream nameFile(directory / "name");
++                    std::string hwmonDevName;
++                    if (!nameFile.good() ||
++                        !std::getline(nameFile, hwmonDevName) ||
++                        hwmonDevName != "soc64hwmon")
++                    {
++                        continue;
++                    }
++                    bus = 65535;
++                    addr = 0;
+                 }
+ 
+                 auto thisSensorParameters = getSensorParameters(path);
+-- 
+2.39.0

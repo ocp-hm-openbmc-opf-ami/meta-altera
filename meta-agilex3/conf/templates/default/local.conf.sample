@@ -1,0 +1,128 @@
+# CONF_VERSION is increased each time build/conf/local.conf
+# changes incompatibly and user is requested to manually update.
+CONF_VERSION = "2"
+
+# Target machine
+MACHINE ?= "agilex3_openbmc"
+
+# OpenBMC phosphor distro
+DISTRO ?= "openbmc-phosphor"
+
+# meta-ami/conf/layer.conf adds 'debug-tweaks' via AMI_CORE_FEATURES → EXTRA_IMAGE_FEATURES.
+# 'debug-tweaks' is a Poky-only feature and not valid in the phosphor distro.
+# Remove it and use the phosphor equivalents instead.
+EXTRA_IMAGE_FEATURES:remove = "debug-tweaks"
+EXTRA_IMAGE_FEATURES += "allow-empty-password allow-root-login"
+
+# meta-ami adds onetree-* Aspeed-specific features via LF_CORE_FEATURES and
+# AMI_CORE_FEATURES which pull in packages not present in the Agilex 3 stack.
+# Clear them so only standard phosphor features are used.
+LF_CORE_FEATURES = ""
+AMI_CORE_FEATURES = ""
+
+# meta-ami ships patches without Upstream-Status tags (QA: patch-status).
+# The patch-status check runs in do_patch (not do_package_qa) so INSANE_SKIP
+# does not apply — remove it from ERROR_QA instead.
+ERROR_QA:remove = "patch-status"
+INSANE_SKIP:pn-libcap        += "patch-status"
+INSANE_SKIP:pn-libcap-native  += "patch-status"
+# libapisensor pkgconfig file embeds TMPDIR path (meta-ami upstream issue)
+INSANE_SKIP:pn-libapisensor   += "buildpaths"
+
+# ---------------------------------------------------------------------------
+# BSP: kernel / U-Boot / Trusted Firmware-A
+# These are set here so the build works even without a kas.yml wrapper.
+# Adjust versions/branches as new releases are tagged.
+# ---------------------------------------------------------------------------
+PREFERRED_PROVIDER_virtual/kernel      = "linux-socfpga-lts"
+PREFERRED_VERSION_linux-socfpga-lts    = "6.18%"
+KBRANCH                                = "socfpga-6.18.2-lts"
+LINUX_SRCREV                           = "${AUTOREV}"
+KERNEL_REPO                            = "git://github.com/altera-fpga/linux-socfpga.git"
+
+PREFERRED_PROVIDER_virtual/bootloader  = "u-boot-socfpga"
+PREFERRED_VERSION_u-boot-socfpga       = "v2026.01%"
+UBOOT_REPO                             = "git://github.com/altera-fpga/u-boot-socfpga.git"
+UBOOT_BRANCH                           = "socfpga_v2026.01"
+UBOOT_SRCREV                           = "${AUTOREV}"
+UBOOT_DEFCONFIG                        = "socfpga_agilex3_defconfig"
+UBOOT_DEVICE_TREE                      = "socfpga_agilex3_socdk.dtb"
+
+PREFERRED_VERSION_arm-trusted-firmware = "v2.14%"
+ATF_REPO                               = "git://github.com/altera-fpga/arm-trusted-firmware.git"
+ATF_BRANCH                             = "socfpga_v2.14.0"
+ATF_SRCREV                             = "${AUTOREV}"
+
+# ---------------------------------------------------------------------------
+# Device tree
+# ---------------------------------------------------------------------------
+LINUX_DTS_FILE           = "socfpga_agilex3_socdk.dts"
+CUSTOM_LINUX_DTS_FILE    = "baseline.dts"
+CUSTOM_UBOOT_DEVICE_TREE = "0"
+CUSTOM_LINUX_DEVICE_TREE = "0"
+
+# ---------------------------------------------------------------------------
+# FPGA bitstream
+# Place baseline.core.rbf in meta-agilex3/meta-custom/recipes-fpga/fpga-bitstream/files/
+# ---------------------------------------------------------------------------
+FPGA_ENABLE_CORE_PGM  ?= "1"
+FPGA_RBF_FILE         ?= "baseline.core.rbf"
+
+# ---------------------------------------------------------------------------
+# Boot source
+# ---------------------------------------------------------------------------
+SSBL_BOOT_SOURCE      ?= "mmc0"
+KERNEL_BOOTARGS_SD_MMC ?= ""
+
+# ---------------------------------------------------------------------------
+# Kernel module configuration
+# ---------------------------------------------------------------------------
+KERNEL_MODULE_PROBECONF  = "cfg80211"
+module_conf_cfg80211     = "blacklist cfg80211"
+
+# ---------------------------------------------------------------------------
+# BBMASK: suppress recipes that conflict with the Agilex 3 layer stack
+# meta-ami and meta-core/meta-common ship Aspeed U-Boot and linux-onetree
+# recipes that must not be picked up for Agilex 3.
+# ---------------------------------------------------------------------------
+BBMASK += " meta-ami/.*/recipes-bsp/u-boot/.*"
+BBMASK += " meta-core/meta-common/recipes-bsp/u-boot/.*"
+BBMASK += " meta-ami/.*/recipes-kernel/linux/linux-onetree.*"
+BBMASK += " meta-core/meta-common/recipes-kernel/linux/linux-onetree.*"
+BBMASK += " meta-altera-bsp/recipes-kernel/linux/linux-socfpga-lts_6.12"
+BBMASK += " meta-altera-bsp/recipes-kernel/linux/linux-socfpga-lts_6.6"
+BBMASK += " meta-altera-bsp/recipes-bsp/u-boot/u-boot-socfpga_v2024"
+BBMASK += " meta-altera-bsp/recipes-bsp/u-boot/u-boot-socfpga_v2025"
+BBMASK += " meta-altera-bsp/recipes-bsp/arm-trusted-firmware/arm-trusted-firmware_v2.11"
+BBMASK += " meta-altera-bsp/recipes-bsp/arm-trusted-firmware/arm-trusted-firmware_v2.12"
+BBMASK += " meta-altera-bsp/recipes-bsp/arm-trusted-firmware/arm-trusted-firmware_v2.13"
+BBMASK += " meta-core/meta-common/recipes-security/sssd/sssd_%.bbappend"
+BBMASK += " meta-ami/meta-common/recipes-network/network/static-mac-addr.bbappend"
+BBMASK += " meta-ami/meta-common/recipes-security/google-authenticator-libpam/google-authenticator-libpam_%.bbappend"
+
+# ---------------------------------------------------------------------------
+# Agilex3: mask recipes that are x86/Intel-specific hardware not present on
+# the Agilex 3 aarch64 SoC (intel-ipmi-oem, libpeci).
+# ---------------------------------------------------------------------------
+BBMASK += " meta-ami/meta-common/recipes-phosphor/ipmi/intel-ipmi-oem_%.bbappend"
+BBMASK += " meta-ami/meta-common/recipes-phosphor/ipmi/intel-ipmi-oem-ext.bbappend"
+BBMASK += " meta-core/meta-common/recipes-core/libpeci/libpeci_%.bbappend"
+
+# ---------------------------------------------------------------------------
+# Parallel build
+# ---------------------------------------------------------------------------
+PARALLEL_MAKE    = "-j 8"
+BB_NUMBER_THREADS = "8"
+
+# ---------------------------------------------------------------------------
+# Package management — disable for embedded BMC image
+# ---------------------------------------------------------------------------
+PACKAGE_CLASSES ?= "package_ipk"
+INHERIT += "rm_work"
+
+# Uncomment to enable extra debug output:
+# DISTRO_FEATURES:append = " dbg-pkgs"
+
+# All D-Bus mismatch BBMASKs removed — AMI dbus-interfaces overlay
+# (data_com_ami=true) is now active via git.ami.com, so AMI application
+# bbappends are compatible with the installed D-Bus interface headers.

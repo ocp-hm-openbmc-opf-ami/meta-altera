@@ -1,0 +1,69 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Altera BMC <openbmc@altera.com>
+Date: Sat, 13 Jun 2026 18:00:00 +0000
+Subject: [PATCH] meson: build swampd only, drop libipmid/manualcmds provider
+
+This is a hostless BMC (the HPS is the BMC itself, no host CPU). There is
+no host IPMI, so phosphor-ipmi-host is stubbed out (no libipmid in the
+sysroot or on the rootfs). Stock phosphor-pid-control unconditionally
+requires libipmid and builds the libmanualcmds IPMI OEM provider, which
+breaks do_configure here (meson cannot find libipmid and falls back to a
+disabled wrap download).
+
+swampd's own sources do not use any ipmid symbols; only the libmanualcmds
+IPMI provider does. Drop the libipmid dependency and the libmanualcmds
+target so swampd/setsensor build standalone. PID fan control runs purely
+from the JSON config + D-Bus sensors; the IPMI manual-control path is not
+applicable on a hostless platform.
+
+Upstream-Status: Inappropriate [hostless-platform specific configuration]
+Signed-off-by: Altera BMC <openbmc@altera.com>
+---
+ meson.build | 19 -------------------
+ 1 file changed, 19 deletions(-)
+
+diff --git a/meson.build b/meson.build
+index f39dd8f8..f3015328 100644
+--- a/meson.build
++++ b/meson.build
+@@ -56,7 +56,6 @@ phosphor_dbus_interfaces_dep = dependency('phosphor-dbus-interfaces')
+ phosphor_logging_dep = dependency('phosphor-logging')
+ sdbusplus_dep = dependency('sdbusplus')
+ libsystemd_dep = dependency('libsystemd')
+-ipmid_dep = dependency('libipmid')
+ 
+ 
+ if cxx.has_header('CLI/CLI.hpp')
+@@ -67,7 +66,6 @@ endif
+ 
+ deps = [
+     CLI11_dep,
+-    ipmid_dep,
+     libsystemd_dep,
+     nlohmann_json_dep,
+     phosphor_dbus_interfaces_dep,
+@@ -127,23 +125,6 @@ libswampd_sources = [
+     'experiments/drive.cpp',
+ ]
+ 
+-libmanualcmds_sources = [
+-    'ipmi/main_ipmi.cpp',
+-    'ipmi/manualcmds.cpp',
+-    'ipmi/dbus_mode.cpp',
+-]
+-
+-libmanualcmds = library(
+-    'manualcmds',
+-    libmanualcmds_sources,
+-    implicit_include_directories: false,
+-    dependencies: deps,
+-    version: meson.project_version(),
+-    override_options: ['b_lundef=false'],
+-    install: true,
+-    install_dir: get_option('libdir') / 'ipmid-providers')
+-
+ executable(
+     'swampd',
+     libswampd_sources,
+-- 
+2.39.0

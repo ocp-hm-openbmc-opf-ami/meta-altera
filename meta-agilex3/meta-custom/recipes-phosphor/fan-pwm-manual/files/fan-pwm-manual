@@ -1,0 +1,197 @@
+#!/bin/sh
+# fan-pwm-manual - hardware bring-up helper to hold a fixed fan PWM duty so the
+# FPGA PWM pin can be measured, then hand control back to the swampd PID loop.
+#
+# Production control is swampd (phosphor-pid-control), which writes 0-255 to the
+# axi_fan_control hwmon "pwm1" in a ~100 ms loop. To hold a fixed duty you must
+# stop swampd first - this tool does that for you. Use "auto"/"restore" to resume.
+#
+# Probe point: host_fpwm = FPGA ball AG21 = Pi header pin 33 (3.3-V LVCMOS).
+#   - multimeter (avg): duty * 3.3 V          e.g. 50% -> ~1.65 V
+#   - oscilloscope:      100 MHz / 20000 = 5 kHz square wave, duty = set %
+#
+# This tool makes no persistent change: a reboot returns to the normal boot flow.
+
+PID_SVC="phosphor-pid-control.service"
+
+# axi_fan_control raw register block (driver-independent devmem path).
+PWM_WIDTH_REG="0x20000084"   # pulse width, in clock cycles
+PWM_PERIOD_CYCLES=20000      # 0x4E20 = full scale (100%); 100 MHz / 20000 = 5 kHz
+VREF_MV=3300                 # 3.3-V LVCMOS
+
+PROG="$(basename "$0")"
+
+usage() {
+    cat <<EOF
+Usage: $PROG <command> [arg]
+
+  manual            Stop swampd (PID) so pwm1 stops being overwritten; show state
+  set <pct%|0-255>  Hold a fixed duty via sysfs pwm1 (stops swampd if running)
+  steps [dwell]     Sweep 0/25/50/75/100% pausing <dwell>s (default 5) at each
+  raw <pct%|cycles> Hold a fixed duty by writing the FPGA register directly (devmem)
+  get | status      Show swampd state, hwmon, pwm1 (raw+%), RPM
+  auto | restore    Restart swampd (back to temperature-driven control)
+
+Probe: host_fpwm = AG21 = Pi header pin 33 (3.3-V LVCMOS).
+  multimeter avg = duty * 3.3 V (50% ~ 1.65 V); scope = 5 kHz square wave.
+EOF
+}
+
+is_uint() {
+    case "$1" in
+        ''|*[!0-9]*) return 1 ;;
+        *) return 0 ;;
+    esac
+}
+
+find_hwmon() {
+    for h in /sys/class/hwmon/hwmon*; do
+        if [ "$(cat "$h/name" 2>/dev/null)" = "$1" ]; then
+            echo "$h"
+            return 0
+        fi
+    done
+    return 1
+}
+
+fan_hwmon() {
+    find_hwmon axi_fan_control || {
+        echo "$PROG: axi_fan_control hwmon not found (is the driver loaded?)" >&2
+        return 1
+    }
+}
+
+swampd_active() {
+    systemctl is-active --quiet "$PID_SVC"
+}
+
+stop_swampd() {
+    if swampd_active; then
+        echo "$PROG: stopping $PID_SVC (entering manual mode) ..." >&2
+        systemctl stop "$PID_SVC"
+    fi
+}
+
+pct_to_raw() {     # $1 = percent -> 0-255 (rounded)
+    echo $(( ($1 * 255 + 50) / 100 ))
+}
+
+raw_to_pct() {     # $1 = 0-255 -> percent (rounded)
+    echo $(( ($1 * 100 + 127) / 255 ))
+}
+
+pct_to_cycles() {  # $1 = percent -> PWM cycles (rounded)
+    echo $(( ($1 * PWM_PERIOD_CYCLES + 50) / 100 ))
+}
+
+report_voltage() { # $1 = percent
+    mv=$(( $1 * VREF_MV / 100 ))
+    echo "  expect AG21 avg ~${mv} mV (${1}% * 3.3 V); scope: 5 kHz square @ ${1}% duty"
+}
+
+cmd_status() {
+    if swampd_active; then
+        echo "swampd ($PID_SVC): active  -> swampd (temperature-driven) owns pwm1"
+    else
+        echo "swampd ($PID_SVC): inactive -> manual (pwm1 holds its value)"
+    fi
+    fh="$(fan_hwmon)" || return 1
+    echo "hwmon: $fh ($(cat "$fh/name" 2>/dev/null))"
+    if [ -r "$fh/pwm1" ]; then
+        raw="$(cat "$fh/pwm1")"
+        echo "pwm1: $raw ($(raw_to_pct "$raw")%)"
+    fi
+    [ -r "$fh/fan1_input" ] && echo "fan1_input: $(cat "$fh/fan1_input") RPM"
+}
+
+cmd_manual() {
+    fh="$(fan_hwmon)" || exit 1
+    stop_swampd
+    echo "$PROG: manual mode active; pwm1 will hold its current value."
+    echo "  probe host_fpwm = AG21 = Pi header pin 33 (3.3-V LVCMOS)."
+    cmd_status
+}
+
+cmd_set() {
+    arg="$1"
+    case "$arg" in
+        *%) pct="${arg%\%}"
+            is_uint "$pct" || { echo "$PROG: bad percent '$arg'" >&2; exit 1; }
+            [ "$pct" -gt 100 ] && pct=100
+            raw="$(pct_to_raw "$pct")" ;;
+        *)  is_uint "$arg" || { echo "$PROG: bad value '$arg' (use NN% or 0-255)" >&2; exit 1; }
+            raw="$arg"
+            [ "$raw" -gt 255 ] && raw=255
+            pct="$(raw_to_pct "$raw")" ;;
+    esac
+    fh="$(fan_hwmon)" || exit 1
+    stop_swampd
+    if ! echo "$raw" > "$fh/pwm1" 2>/dev/null; then
+        echo "$PROG: failed writing $fh/pwm1" >&2
+        exit 1
+    fi
+    echo "$PROG: pwm1=$raw (${pct}%) on $fh"
+    report_voltage "$pct"
+}
+
+cmd_steps() {
+    dwell="${1:-5}"
+    is_uint "$dwell" || { echo "$PROG: bad dwell '$dwell'" >&2; exit 1; }
+    fh="$(fan_hwmon)" || exit 1
+    stop_swampd
+    for pct in 0 25 50 75 100; do
+        raw="$(pct_to_raw "$pct")"
+        echo "$raw" > "$fh/pwm1" 2>/dev/null || {
+            echo "$PROG: failed writing $fh/pwm1" >&2; exit 1; }
+        echo "$PROG: pwm1=$raw (${pct}%) - holding ${dwell}s"
+        report_voltage "$pct"
+        sleep "$dwell"
+    done
+    echo "$PROG: sweep done; pwm1 left at 100%. Run '$PROG auto' to resume PID."
+}
+
+cmd_raw() {
+    arg="$1"
+    case "$arg" in
+        *%) pct="${arg%\%}"
+            is_uint "$pct" || { echo "$PROG: bad percent '$arg'" >&2; exit 1; }
+            [ "$pct" -gt 100 ] && pct=100
+            cycles="$(pct_to_cycles "$pct")" ;;
+        *)  is_uint "$arg" || { echo "$PROG: bad value '$arg' (use NN% or cycles)" >&2; exit 1; }
+            cycles="$arg"
+            [ "$cycles" -gt "$PWM_PERIOD_CYCLES" ] && cycles="$PWM_PERIOD_CYCLES"
+            pct=$(( cycles * 100 / PWM_PERIOD_CYCLES )) ;;
+    esac
+    if ! command -v devmem >/dev/null 2>&1; then
+        echo "$PROG: devmem not available on this image" >&2
+        exit 1
+    fi
+    stop_swampd
+    devmem "$PWM_WIDTH_REG" 32 "$cycles" || {
+        echo "$PROG: devmem write to $PWM_WIDTH_REG failed" >&2; exit 1; }
+    echo "$PROG: devmem $PWM_WIDTH_REG = $cycles / $PWM_PERIOD_CYCLES cycles (${pct}%)"
+    report_voltage "$pct"
+    echo "  note: bypasses the hwmon driver; 'get' may not reflect this. 'auto' resets it."
+}
+
+cmd_auto() {
+    echo "$PROG: restarting $PID_SVC (temperature-driven) ..."
+    systemctl start "$PID_SVC"
+    if swampd_active; then
+        echo "$PROG: swampd active - temperature-driven control resumed."
+    else
+        echo "$PROG: WARNING: swampd not active; check 'systemctl status $PID_SVC'." >&2
+        exit 1
+    fi
+}
+
+case "$1" in
+    manual)         cmd_manual ;;
+    set)            shift; [ -n "$1" ] || { usage; exit 1; }; cmd_set "$1" ;;
+    steps)          shift; cmd_steps "$1" ;;
+    raw)            shift; [ -n "$1" ] || { usage; exit 1; }; cmd_raw "$1" ;;
+    get|status)     cmd_status ;;
+    auto|restore)   cmd_auto ;;
+    -h|--help|help|"") usage ;;
+    *) echo "$PROG: unknown command '$1'" >&2; usage; exit 1 ;;
+esac

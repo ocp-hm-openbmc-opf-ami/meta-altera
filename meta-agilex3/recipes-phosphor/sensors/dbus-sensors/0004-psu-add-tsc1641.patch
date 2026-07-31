@@ -1,0 +1,36 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Altera BMC <openbmc@altera.com>
+Date: Sat, 14 Jun 2026 12:00:00 +0000
+Subject: [PATCH] psu: add TSC1641 to sensorTypes
+
+The ST TSC1641 is the 60V/16-bit power monitor on the MikroE Current 12
+Click (MIKROE-6065) used in the Step 4 demo, and on the Phase-2 Altera
+sensor board. The Linux hwmon "tsc1641" driver exposes load voltage
+(in0), current (curr1), power (power1) and temperature (temp1), but
+psusensor's sensorTypes map did not list it, so an entity-manager
+"TSC1641" Exposes entry was ignored.
+
+Add the type so dbus-sensors instantiates the device with driver name
+"tsc1641" (createsHWMon = true) and publishes its power telemetry on
+D-Bus / Redfish.
+
+Upstream-Status: Pending
+Signed-off-by: Altera BMC <openbmc@altera.com>
+---
+ src/psu/PSUSensorMain.cpp | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/psu/PSUSensorMain.cpp b/src/psu/PSUSensorMain.cpp
+index 42af138..f8f2f11 100644
+--- a/src/psu/PSUSensorMain.cpp
++++ b/src/psu/PSUSensorMain.cpp
+@@ -144,6 +144,7 @@ static const I2CDeviceTypeMap sensorTypes = {
+     {"TPS25990", I2CDeviceType{"tps25990", true}},
+     {"TPS53679", I2CDeviceType{"tps53679", true}},
+     {"TPS546D24", I2CDeviceType{"tps546d24", true}},
++    {"TSC1641", I2CDeviceType{"tsc1641", true}},
+     {"XDP710", I2CDeviceType{"xdp710", true}},
+     {"XDPE11280", I2CDeviceType{"xdpe11280", true}},
+     {"XDPE12284", I2CDeviceType{"xdpe12284", true}},
+-- 
+2.39.0

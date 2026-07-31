@@ -1,0 +1,19 @@
+[Unit]
+Description=ST IIS2DULPX accelerometer (SPI) reader
+Documentation=https://www.st.com/en/mems-and-sensors/iis2dulpx.html
+# Bring-up/demo daemon: reads the accelerometer over spidev and
+# publishes /run/iis2dulpx/accel.json. The daemon polls for the chip and idles
+# until it is present, so it is safe to enable at boot even before the Altera
+# sensor board's IIS2DULPX is ready.
+After=basic.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/iis2dulpx-accel
+RuntimeDirectory=iis2dulpx
+# Daemon does not exit on a missing chip (it waits); Restart guards a crash.
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

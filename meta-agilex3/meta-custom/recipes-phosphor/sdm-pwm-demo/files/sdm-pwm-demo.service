@@ -1,0 +1,16 @@
+[Unit]
+Description=DEMO: SDM on-die temp -> fan PWM (open loop, pre-hardware)
+Documentation=man:swampd(8)
+# This demo drives the same pwm1 that swampd controls; never run both.
+Conflicts=phosphor-pid-control.service
+After=xyz.openbmc_project.FanSensor.service
+
+[Service]
+Type=simple
+# LO_C -> 0% duty, HI_C -> 100% duty. Tune for the SoC's idle/load range.
+Environment=LO_C=30 HI_C=60
+ExecStart=/usr/bin/sdm-pwm-demo.sh
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

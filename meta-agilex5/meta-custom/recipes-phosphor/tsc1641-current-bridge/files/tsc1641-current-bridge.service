@@ -1,0 +1,18 @@
+[Unit]
+Description=TSC1641 (VH/VFAN) I3C power monitors -> D-Bus bridge
+# The two TSC1641 enumerate natively on the I3C bus (patched tsc1641 driver) and
+# so appear only as hwmon nodes, not on a legacy i2c bus that dbus-sensors can
+# instantiate. This daemon reads both hwmons (told apart by their I3C address)
+# and pushes voltage/current/power/die temperature onto the matching Heater_*/Fan_*
+# ExternalSensors so they reach Redfish.
+After=basic.target xyz.openbmc_project.EntityManager.service
+Wants=xyz.openbmc_project.EntityManager.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/tsc1641-current-bridge
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

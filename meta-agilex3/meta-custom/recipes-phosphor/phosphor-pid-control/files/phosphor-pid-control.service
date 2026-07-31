@@ -1,0 +1,50 @@
+[Unit]
+Description=Phosphor PID Fan Control (swampd)
+# swampd reads /usr/share/swampd/config.json and drives pwm1 on the ADI
+# axi-fan-control IP from Board_Temp. Order it after the bits it depends on:
+#   - EntityManager / ObjectMapper publish the sensor configuration on D-Bus
+#   - fansensor publishes Fan_Ctrl tach (the fan PID's feedback)
+#   - the modprobe oneshot has loaded axi-fan-control so /sys .../pwm1 exists
+After=xyz.openbmc_project.EntityManager.service
+After=xyz.openbmc_project.ObjectMapper.service
+After=xyz.openbmc_project.fansensor.service
+After=axi-fan-control-modprobe.service
+Wants=xyz.openbmc_project.fansensor.service
+# Allow unlimited restarts - swampd must never be left permanently stopped.
+StartLimitIntervalSec=0
+
+[Service]
+Restart=always
+RestartSec=5
+# Wait for Fan_Ctrl tach object on D-Bus before starting swampd.
+# fansensor publishes this only after entity-manager has scanned the config
+# and the hwmon driver has probed - that takes several seconds after the
+# service units above report "started". Without this wait swampd subscribes
+# to InterfacesAdded before the object exists, misses the initial publish,
+# and stays in fail-safe (100% fan) for the whole session.
+# Polls every 2 s, times out after 90 s (gives a slow first boot plenty of
+# headroom). If it times out swampd still starts; it will just enter fail-safe
+# and Restart=always will retry after 5 s.
+ExecStartPre=/bin/sh -c '\
+  n=0; \
+  while [ $n -lt 90 ]; do \
+    busctl call xyz.openbmc_project.ObjectMapper \
+      /xyz/openbmc_project/object_mapper \
+      xyz.openbmc_project.ObjectMapper \
+      GetObject sas \
+      /xyz/openbmc_project/sensors/fan_tach/Fan_Ctrl 0 \
+      >/dev/null 2>&1 && \
+    busctl call xyz.openbmc_project.ObjectMapper \
+      /xyz/openbmc_project/object_mapper \
+      xyz.openbmc_project.ObjectMapper \
+      GetObject sas \
+      /xyz/openbmc_project/sensors/temperature/Board_Temp 0 \
+      >/dev/null 2>&1 && exit 0; \
+    sleep 2; n=$((n+2)); \
+  done; \
+  exit 0'
+# Default config path is /usr/share/swampd/config.json (shipped by this recipe).
+ExecStart=/usr/bin/swampd
+
+[Install]
+WantedBy=multi-user.target

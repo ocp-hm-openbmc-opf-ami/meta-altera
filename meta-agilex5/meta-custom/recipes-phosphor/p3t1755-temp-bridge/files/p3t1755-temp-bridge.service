@@ -1,0 +1,17 @@
+[Unit]
+Description=P3T1755 (Thermo 10) I3C temperature -> D-Bus bridge
+# The P3T1755 enumerates natively on the I3C bus (lm75_i3c) and so appears only
+# as a hwmon node, not on a legacy i2c bus that dbus-sensors can instantiate.
+# This daemon reads that hwmon and pushes it onto the "Board_Temp"
+# ExternalSensor so it reaches Redfish and phosphor-pid-control.
+After=basic.target xyz.openbmc_project.EntityManager.service
+Wants=xyz.openbmc_project.EntityManager.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/p3t1755-temp-bridge
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

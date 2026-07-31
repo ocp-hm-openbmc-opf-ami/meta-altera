@@ -1,0 +1,22 @@
+[Match]
+Name=eth0
+
+[Network]
+# DHCPv4 only. IPv6 is disabled — no RA acceptance, no DHCPv6.
+# Simplifies the network stack and avoids interference on networks
+# that don't provide IPv6.
+DHCP=ipv4
+LinkLocalAddressing=ipv4
+IPv6AcceptRA=false
+
+[DHCPv4]
+# Use MAC as client ID so the DHCP lease (and IP) is stable across reboots.
+# The MAC is pinned in the U-Boot environment (eth2addr in the
+# u-boot-socfpga-env-var bbappend); without that, U-Boot generates a random MAC
+# each boot and fixes it into the kernel FDT, so the DHCP server would treat
+# every reboot as a new client and hand out a different IP.
+ClientIdentifier=mac
+UseDNS=true
+UseNTP=true
+UseHostname=true
+SendHostname=true
