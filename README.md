@@ -1,110 +1,60 @@
-# meta-altera — Altera SoCFPGA OpenBMC Layer
+# OpenBMC
 
-OpenBMC platform layer for Altera SoCFPGA devices (Agilex 3 C-Series).
+OpenBMC is a Linux distribution for management controllers used in devices such
+as servers, top of rack switches or RAID appliances. It uses
+[Yocto](https://www.yoctoproject.org/),
+[OpenEmbedded](https://www.openembedded.org/wiki/Main_Page),
+[systemd](https://www.freedesktop.org/wiki/Software/systemd/), and
+[D-Bus](https://www.freedesktop.org/wiki/Software/dbus/) to allow easy
+customization for your platform.
 
-## Supported Machines
+## Setting up your OpenBMC project
 
-| Machine              | Device             | Board                          |
-|----------------------|--------------------|--------------------------------|
-| `agilex3_openbmc`    | A3CW135BM16AE6S    | DK-A3W135BM16AEA (C-Series DK) |
+### 1) Prerequisite
 
-## Layer Dependencies
+See the
+[Yocto documentation](https://docs.yoctoproject.org/ref-manual/system-requirements.html#required-packages-for-the-build-host)
+for the latest requirements
 
-| Layer             | Collection name  | Source                                                                 |
-|-------------------|------------------|------------------------------------------------------------------------|
-| `meta-phosphor`   | `phosphor-layer` | OpenBMC tree (`##OEROOT##/meta-phosphor`)                             |
-| `meta-altera-bsp` | `altera-bsp`     | External — **must be cloned separately** (see below)                   |
-| `meta-arm`        | `arm`            | OpenBMC tree (`##OEROOT##/meta-arm/meta-arm`)                         |
-| `meta-intel-openbmc` | `intel-openbmc` | OpenBMC tree (`##OEROOT##/meta-intel-openbmc`)                       |
+#### Ubuntu
 
-### Cloning meta-altera-fpga (required external BSP layer)
-
-`meta-altera-bsp` lives inside the **meta-altera-fpga** repository and provides the
-kernel (`linux-socfpga-lts`), U-Boot (`u-boot-socfpga`), Trusted Firmware-A, and
-`conf/machine/include/socfpga_armv8-2a.inc`.
-
-```bash
-# Clone alongside the openbmc tree (adjust path as needed)
-git clone https://github.com/altera-collab/applications.fpga.soc.meta-altera-fpga.git \
-    --branch scarthgap \
-    /home/<user>/AMI_OCP_Altera/meta-altera-fpga
+```sh
+sudo apt install git gcc g++ make file wget \
+    gawk diffstat bzip2 cpio chrpath zstd lz4 bzip2
 ```
 
-Then update `meta-altera/conf/templates/default/bblayers.conf.sample`, replacing
-`##META_ALTERA_FPGA_PATH##` with the actual clone path.
+#### Fedora
 
-## Quick Start
+```sh
+sudo dnf install git python3 gcc g++ gawk which bzip2 chrpath cpio \
+    hostname file diffutils diffstat lz4 wget zstd rpcgen patch
+```
 
-### Using the `setup` script
+### 2) Download and build
 
-```bash
-cd /home/<user>/AMI_OCP_Altera/openbmc
-# Update bblayers.conf.sample first (replace ##META_ALTERA_FPGA_PATH##)
-source setup agilex3_openbmc build-agilex3
+### 2.1 Agilex-3
+```sh
+git clone --branch CE-AMI202607 https://github.com/ocp-hm-openbmc-opf-ami/openbmc openbmc; cd openbmc
+git clone --branch CE-AMI202607 https://github.com/ocp-hm-openbmc-opf-ami/meta-core
+git clone --branch CE-AMI202607 https://github.com/ocp-hm-openbmc-opf-ami/meta-ami
+git clone --branch Agilex3_Agilex5_support https://github.com/ocp-hm-openbmc-opf-ami/meta-altera.git
+
+meta-ami/github-gitlab-url.sh
+
+TEMPLATECONF=meta-altera/meta-agilex3/conf/templates/default . openbmc-env
+
 bitbake obmc-phosphor-image
 ```
 
-### Manual bblayers.conf
+### 2.2 Agilex-5
+```sh
+git clone --branch CE-AMI202607 https://github.com/ocp-hm-openbmc-opf-ami/openbmc openbmc; cd openbmc
+git clone --branch CE-AMI202607 https://github.com/ocp-hm-openbmc-opf-ami/meta-core
+git clone --branch CE-AMI202607 https://github.com/ocp-hm-openbmc-opf-ami/meta-ami
+git clone --branch Agilex3_Agilex5_support https://github.com/ocp-hm-openbmc-opf-ami/meta-altera.git
 
-Add the following to `build/conf/bblayers.conf`:
+meta-ami/github-gitlab-url.sh
 
-```
-BBLAYERS += " \
-    /path/to/meta-altera-fpga/meta-altera-bsp \
-    ##OEROOT##/meta-altera \
-    "
-```
-
-## Layer Structure
-
-```
-meta-altera/
-  conf/
-    layer.conf                          — Layer metadata (collection: altera-layer, priority: 7)
-    machine/
-      include/
-        socfpga_armv8-2a.inc            — Stub; canonical version from meta-altera-bsp
-      agilex3_openbmc.conf              — MACHINE = "agilex3_openbmc"
-    templates/default/
-      bblayers.conf.sample              — Used by the openbmc/setup script
-      local.conf.sample                 — BSP versions, MACHINE, DISTRO defaults
-  recipes-core/
-    dbus-broker-config/                 — Systemd sandbox overrides (CONFIG_MNT_NS workaround)
-  recipes-extended/
-    pam/
-      libpam_%.bbappend                 — Remove pam_pwquality to allow simple passwords
-  recipes-phosphor/
-    first-boot-set-priv/                — Set root Redfish priv-admin on first boot
-    interfaces/
-      bmcweb_%.bbappend                 — Enable Redfish BMC journal
-    ipmi/
-      phosphor-ipmi-fru_%.bbappend      — Stub (hostless BMC)
-      phosphor-ipmi-host_%.bbappend     — Keep libipmid for dependents
-      phosphor-ipmi-net_%.bbappend      — Stub (no RMCP needed)
-    packagegroups/
-      packagegroup-obmc-apps.bbappend   — Remove trace-enable, obmc-ikvm
-    sensors/
-      dbus-sensors_%.bbappend           — Apply Altera-specific sensor patches
-      dbus-sensors/                     — Patch files (soc64-hwmon, AXI fan, P3T1755, TSC1641)
-```
-
-## BSP Versions (walnascar / scarthgap)
-
-| Component            | Version         | Repository                                             |
-|----------------------|-----------------|--------------------------------------------------------|
-| Linux kernel         | 6.18 LTS        | `github.com/altera-fpga/linux-socfpga`                 |
-| U-Boot               | v2026.01        | `github.com/altera-fpga/u-boot-socfpga`               |
-| ARM Trusted Firmware | v2.14           | `github.com/altera-fpga/arm-trusted-firmware`          |
-| Yocto release        | walnascar       | OpenBMC tree                                           |
-
-## Key Variables to Set in local.conf / kas.yml
-
-```bitbake
-MACHINE             = "agilex3_openbmc"
-DISTRO              = "openbmc-phosphor"
-LINUX_DTS_FILE      = "socfpga_agilex3_socdk.dts"
-UBOOT_DEFCONFIG     = "socfpga_agilex3_defconfig"
-UBOOT_DEVICE_TREE   = "socfpga_agilex3_socdk.dtb"
-SSBL_BOOT_SOURCE    = "mmc0"    # or "qspi"
-FPGA_RBF_FILE       = "baseline.core.rbf"   # place in recipes-fpga/fpga-bitstream/files/
+TEMPLATECONF=meta-altera/meta-agilex5/conf/templates/default . openbmc-env
+bitbake obmc-phosphor-image
 ```

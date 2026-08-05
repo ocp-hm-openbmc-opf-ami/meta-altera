@@ -2,13 +2,8 @@ SUMMARY = "Default FRU for Agilex5"
 DESCRIPTION = "Installs a default FRU blob required by OneTree FRU packagegroups"
 LICENSE = "CLOSED"
 
-SRC_URI = "file://baseboard.fru.bin"
+SRC_URI = "file://baseboard.fru.bin;unpack=false"
 S = "${UNPACKDIR}"
-
-# BitBake in this environment rejects variable-containing cleandirs entries for
-# this task. Keep unpack cleanup empty for this local file:// recipe.
-do_unpack[cleandirs] = ""
-base_do_unpack[cleandirs] = ""
 
 do_install() {
     install -d ${D}${sysconfdir}/fru

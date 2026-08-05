@@ -14,12 +14,6 @@ DISTRO ?= "openbmc-phosphor"
 EXTRA_IMAGE_FEATURES:remove = "debug-tweaks"
 EXTRA_IMAGE_FEATURES += "allow-empty-password allow-root-login"
 
-# meta-ami adds onetree-* Aspeed-specific features via LF_CORE_FEATURES and
-# AMI_CORE_FEATURES which pull in packages not present in the Agilex 3 stack.
-# Clear them so only standard phosphor features are used.
-LF_CORE_FEATURES = ""
-AMI_CORE_FEATURES = ""
-
 # meta-ami ships patches without Upstream-Status tags (QA: patch-status).
 # The patch-status check runs in do_patch (not do_package_qa) so INSANE_SKIP
 # does not apply — remove it from ERROR_QA instead.
@@ -98,15 +92,15 @@ BBMASK += " meta-altera-bsp/recipes-bsp/arm-trusted-firmware/arm-trusted-firmwar
 BBMASK += " meta-altera-bsp/recipes-bsp/arm-trusted-firmware/arm-trusted-firmware_v2.13"
 BBMASK += " meta-core/meta-common/recipes-security/sssd/sssd_%.bbappend"
 BBMASK += " meta-ami/meta-common/recipes-network/network/static-mac-addr.bbappend"
-BBMASK += " meta-ami/meta-common/recipes-security/google-authenticator-libpam/google-authenticator-libpam_%.bbappend"
 
 # ---------------------------------------------------------------------------
 # Agilex3: mask recipes that are x86/Intel-specific hardware not present on
 # the Agilex 3 aarch64 SoC (intel-ipmi-oem, libpeci).
 # ---------------------------------------------------------------------------
-BBMASK += " meta-ami/meta-common/recipes-phosphor/ipmi/intel-ipmi-oem_%.bbappend"
 BBMASK += " meta-ami/meta-common/recipes-phosphor/ipmi/intel-ipmi-oem-ext.bbappend"
 BBMASK += " meta-core/meta-common/recipes-core/libpeci/libpeci_%.bbappend"
+BBMASK += " meta-ami/meta-common/recipes-phosphor/fans/phosphor-pid-control_%.bbappend"
+BBMASK += " meta-core/meta-common/recipes-phosphor/fans/phosphor-pid-control_%.bbappend"
 
 # ---------------------------------------------------------------------------
 # Parallel build
