@@ -1,32 +1,25 @@
-# phosphor-ipmi-host is already fully built by default (meta-common only keeps
-# a comment here, it does not stub any tasks). Just remove the circular
-# RRECOMMENDS that would pull in phosphor-settings-manager.
 RRECOMMENDS:${PN}:remove = "phosphor-settings-manager"
 
-# Fix two ipmid issues on agilex3:
+# Fix ipmid issues on agilex3:
 #
 # 1. Startup SEGV — get-dbus-active-software (meson default: auto=enabled)
-#    ipmid calls getActiveSoftwareVersionInfo() on every Get-Device-ID request.
-#    getAllDbusObjects() for xyz.openbmc_project.Software.RedundancyPriority
-#    returns EINVAL (no objects) because phosphor-software-manager is absent.
-#    elog<InternalFailure>() causes SIGSEGV. Disable the feature so ipmid
-#    reads the BMC firmware version from the static dev_id.json instead.
-#
 # 2. Enable dynamic sensor reading (ipmitool sensor)
-#    The default dynamic-sensors=disabled uses a static YAML-based sensor map.
-#    The agilex3 sensor.yaml is 0 bytes (no static sensors), causing the static
-#    Get-SDR handler to crash. Enabling dynamic-sensors builds libdynamiccmds.so
-#    which reads sensor objects from dbus-sensors at runtime.
-#    dbus-sdr/storagecommands.cpp uses the old sdbusplus::object_path API (now
-#    sdbusplus::message::object_path). Fix all four occurrences with sed before
-#    meson configure so the file compiles cleanly.
-#
-# 3. StartLimitIntervalSec in [Service] (AMI service file) generates a systemd
-#    warning in walnascar. Drop-in 20-fix-startlimit.conf moves it to [Unit].
+#    dbus-sdr/storagecommands.cpp uses the old sdbusplus::object_path API.
+# 3. StartLimitIntervalSec in [Service] (AMI service file) systemd warning fix.
+# 4. Add humidity/percent to sensorTypes map so PercentRH sensors show as
+#    threshold (numeric percentage) instead of discrete in ipmitool.
+# 5. Set IPMI percentage bit (sensor_units_1 bit 0) for humidity sensors so
+#    ipmitool shows "percent" instead of "unspecified" for Fan_Vibration/Slider.
 #
 do_configure:prepend() {
     sed -i 's/sdbusplus::object_path/sdbusplus::message::object_path/g' \
         ${S}/dbus-sdr/storagecommands.cpp
+    # humidity/percent missing from sensorTypes → eventReadingType=0 → discrete in ipmitool
+    sed -i 's/SensorEventTypeCodes::threshold)}}};/SensorEventTypeCodes::threshold)}, {"humidity", std::make_pair(SensorTypeCodes::other, SensorEventTypeCodes::threshold)}, {"percent", std::make_pair(SensorTypeCodes::other, SensorEventTypeCodes::threshold)}}};/' \
+        ${S}/dbus-sdr/sdrutils.cpp
+    # set IPMI percentage bit in sensor_units_1 for humidity (PercentRH) sensors
+    sed -i 's/record\.body\.sensor_units_1 = (bSigned ? 1 : 0) << 7;/record.body.sensor_units_1 = ((bSigned ? 1 : 0) << 7) | (type == "humidity" ? 1 : 0);/' \
+        ${S}/dbus-sdr/sensorcommands.cpp
 }
 
 FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:"

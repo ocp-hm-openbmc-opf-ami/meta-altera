@@ -149,5 +149,6 @@
         "PartNumber": "DK-A3W135B",
         "SerialNumber": "Unknown"
     },
-    "xyz.openbmc_project.Inventory.Item.Board": {}
+    "xyz.openbmc_project.Inventory.Item.Board": {},
+    "xyz.openbmc_project.Inventory.Item.Chassis": {}
 }
