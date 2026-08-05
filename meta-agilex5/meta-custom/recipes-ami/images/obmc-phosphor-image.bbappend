@@ -36,3 +36,23 @@ mask_predictable_naming() {
 ROOTFS_POSTPROCESS_COMMAND:remove = "write_flash_size_to_file; "
 ROOTFS_POSTPROCESS_COMMAND += "write_flash_size_to_file_meta_custom; "
 ROOTFS_POSTPROCESS_COMMAND += "mask_predictable_naming; "
+
+IMAGE_INSTALL:append = " \
+    phosphor-ipmi-host \
+    intel-ipmi-oem \
+    ipmitool \
+    bmcweb \
+    phosphor-user-manager \
+    session-management \
+    tzdata \
+    phosphor-certificate-manager \
+    webui-vue \
+    srvcfg-manager \
+    entity-manager \
+    entity-config \
+    dbus-sensors \
+    p3t1755-temp-bridge \
+    tsc1641-current-bridge \
+    iis2dulpx-accel \
+    qtpy-uart-bridge \
+    "
