@@ -25,6 +25,7 @@ BBLAYERS ?= " \
   ##OEROOT##/meta-altera/meta-altera-bsp \
   ##OEROOT##/meta-altera \
   ##OEROOT##/meta-altera/meta-common \
+  ##OEROOT##/meta-altera/meta-altera-platform \
   ##OEROOT##/meta-altera/meta-agilex3 \
   ##OEROOT##/meta-altera/meta-agilex3/meta-custom \
   "
