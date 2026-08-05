@@ -12,7 +12,7 @@ DISTRO ?= "openbmc-phosphor"
 # 'debug-tweaks' is a Poky-only feature and not valid in the phosphor distro.
 # Remove it and use the phosphor equivalents instead.
 EXTRA_IMAGE_FEATURES:remove = "debug-tweaks"
-EXTRA_IMAGE_FEATURES += "allow-empty-password allow-root-login onetree-sensors"
+EXTRA_IMAGE_FEATURES += "allow-empty-password allow-root-login"
 
 # meta-ami adds onetree-* Aspeed-specific features via LF_CORE_FEATURES and
 # AMI_CORE_FEATURES which pull in packages not present in the Agilex 5 stack.

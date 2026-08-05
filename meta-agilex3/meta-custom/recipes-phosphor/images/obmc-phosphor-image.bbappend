@@ -23,12 +23,8 @@
 # makes it complex to enable and it is not required for local use.
 IMAGE_INSTALL:append = " \
     phosphor-ipmi-host \
-    intel-ipmi-oem \
     ipmitool \
     bmcweb \
-    phosphor-user-manager \
-    session-management \
-    tzdata \
     phosphor-certificate-manager \
     webui-vue \
     srvcfg-manager \
