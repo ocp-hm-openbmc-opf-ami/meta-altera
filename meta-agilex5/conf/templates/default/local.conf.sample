@@ -59,7 +59,7 @@ CUSTOM_LINUX_DEVICE_TREE = "0"
 # FPGA bitstream
 # Place baseline.core.rbf in meta-agilex5/meta-custom/recipes-fpga/fpga-bitstream/files/
 # ---------------------------------------------------------------------------
-FPGA_ENABLE_CORE_PGM  ?= "1"
+FPGA_ENABLE_CORE_PGM  ?= "0"
 FPGA_RBF_FILE         ?= "baseline.core.rbf"
 
 # ---------------------------------------------------------------------------
