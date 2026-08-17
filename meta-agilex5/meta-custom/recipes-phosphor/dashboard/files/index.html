@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Altera Programmable Infrastructure Management — Agilex 3E OpenBMC</title>
+<!--
+  Branded, auto-refreshing chassis dashboard. Discovers every Redfish sensor
+  under /redfish/v1/Chassis/<id>/Sensors, renders a live card + sparkline per
+  sensor, pulls the Redfish event log, and shows a static system-topology and
+  capability panel for the demo.
+
+  IMPORTANT — served by bmcweb (same origin as Redfish): bmcweb attaches a strict
+  Content-Security-Policy (default-src 'none'; img-src 'self' data:; style-src
+  'self'; script-src 'self'; ...). That blocks inline <style>, inline <script>,
+  inline style="" attributes, and any CDN. So everything ships same-origin:
+    index.html          (this file, no inline style/script)
+    dashboard.css       (theme + layout)
+    dashboard.js        (Redfish polling + rendering)
+    chart.umd.min.js    (vendored Chart.js for sparklines — script-src 'self')
+  The Altera wordmark is inlined as <svg> below: an inline SVG element is part of
+  the document (not an external image fetch), so it renders regardless of CSP.
+
+  Hosting: installed to /usr/share/www/dashboard/ by the dashboard
+  recipe; bmcweb serves it at https://<bmc>/dashboard/ (reachable directly or via
+  an SSH tunnel mapping localhost -> BMC:443).
+-->
+<link rel="stylesheet" href="/dashboard/dashboard.css" />
+</head>
+<body>
+<div class="page">
+
+  <!-- ===== Brand bar ===== -->
+  <header class="brand">
+    <div class="brand-mark">
+      <svg class="logo" viewBox="0 0 145.76 42" role="img" aria-label="Altera">
+        <g>
+          <path class="lf" d="M121.06,12.63c-.36-.02-.67-.04-.97-.04-3.51,0-6.81,1.42-9.29,4-2.5,2.6-3.87,6.1-3.87,9.86,0,7.64,5.9,13.86,13.16,13.86,3.29,0,6.1-1.1,8.17-3.18v2.52h6.7v-13.22l-13.81-13.81h-.09ZM120.95,33.87c-4.24,0-7.31-3.12-7.31-7.41s3.08-7.41,7.31-7.41,7.31,3.12,7.31,7.41-3.08,7.41-7.31,7.41"/>
+          <rect class="lf" x="128.26" y="13.05" width="6.7" height="6.7"/>
+          <path class="lf" d="M23.29,13.25v2.52c-1.97-1.98-4.6-3.06-7.68-3.17-.09,0-.18,0-.27,0-.08,0-.15,0-.22,0-.23,0-.45,0-.67.02,0,0-.01,0-.02,0-.21.01-.41.03-.62.05-3.02.31-5.81,1.68-7.98,3.93-1.25,1.3-2.22,2.83-2.87,4.5-.66,1.67-1,3.49-1,5.37h0c0,3.76,1.38,7.26,3.87,9.86,2.31,2.41,5.34,3.81,8.59,3.98,0,0,.01,0,.02,0,.22.01.45.02.67.02.16,0,.32,0,.49-.01,1.86-.06,3.56-.48,5.05-1.25.32-.17.64-.35.94-.55.15-.1.3-.2.45-.31.29-.21.57-.44.84-.69.14-.12.27-.25.4-.38v2.52h6.7V13.25h-6.7ZM15.97,33.87c-2.25,0-4.17-.88-5.48-2.35-.23-.26-.44-.54-.63-.83-.06-.1-.13-.2-.18-.3-.06-.1-.12-.21-.17-.31-.16-.32-.3-.65-.42-.99-.04-.12-.08-.23-.11-.35-.03-.12-.07-.24-.09-.36-.03-.12-.05-.24-.08-.37-.02-.12-.04-.25-.06-.38-.02-.13-.03-.25-.04-.38-.02-.26-.04-.52-.04-.79s.01-.53.04-.79c.01-.13.03-.26.04-.38.03-.25.08-.5.14-.74.03-.12.06-.24.09-.36.03-.12.07-.24.11-.35.16-.46.36-.9.59-1.3.06-.1.12-.2.18-.3.13-.2.26-.39.41-.57.07-.09.15-.18.22-.27,1.31-1.47,3.23-2.35,5.48-2.35,2.12,0,3.95.78,5.25,2.1.08.08.16.17.24.25s.15.17.22.27c.15.18.28.37.41.57.06.1.13.2.18.3.14.25.27.51.38.77.17.39.31.81.41,1.24.06.24.1.49.14.74.02.13.03.25.04.38.02.26.04.52.04.79s-.01.53-.04.79c-.01.13-.03.26-.04.38-.03.25-.08.5-.14.74-.11.49-.27.95-.47,1.38-.1.22-.21.43-.33.63-.06.1-.12.2-.18.3-.13.2-.26.39-.41.57-.07.09-.15.18-.22.27-.15.17-.32.34-.49.49-.09.08-.17.15-.26.23-1.25,1.03-2.88,1.63-4.73,1.63Z"/>
+          <rect class="lf" x="34.41" y="1.68" width="6.7" height="37.99"/>
+          <path class="lf" d="M54.83,5.99l-6.7,1.99v5.27h-4.63v6.5h4.63v11.44c0,3.16.77,5.39,2.36,6.8,1.45,1.29,3.59,1.91,6.55,1.91,1.03,0,2.2-.08,3.47-.23l.56-.07v-6.11l-.67.03c-2.65.13-4.31.17-5.04-.52-.36-.35-.53-.92-.53-1.81v-11.44h6.24v-6.5h-6.24v-7.26Z"/>
+          <path class="lf" d="M76.23,12.59c-8.06,0-13.91,5.83-13.91,13.86s5.89,13.86,14.32,13.86c4.93,0,9.03-2.05,11.54-5.76l.38-.56-5.57-3.26-.33.49c-1.24,1.81-3.41,2.84-5.97,2.84-3.64,0-6.25-1.7-7.22-4.67h19.74l.08-.54c.1-.72.21-1.56.21-2.35,0-7.93-5.7-13.91-13.26-13.91ZM69.39,23.71c.92-3.13,3.37-4.92,6.79-4.92s5.59,1.79,6.41,4.92h-13.19Z"/>
+          <path class="lf" d="M106.27,12.8h-.63c-3.04,0-5.48,1.05-7.11,3.06v-2.61h-6.7v26.42h6.7v-13.31c0-2.09.6-3.71,1.79-4.82,1.24-1.16,3.16-1.74,5.27-1.59l.68.05v-7.2Z"/>
+          <path class="lf" d="M137.04,36.47h2.89v.53h-1.17v2.67h-.55v-2.67h-1.16v-.53ZM143.8,39.67h-.55v-2.64l-.94,1.77h-.48l-.95-1.8v2.67h-.55v-3.19h.84l.91,1.69.88-1.69h.84v3.19Z"/>
+        </g>
+      </svg>
+    </div>
+    <div class="brand-title">
+      <h1>Programmable Platform Management</h1>
+      <p>Agilex&trade;&nbsp;3 + OpenBMC + Redfish &middot; Temperature-Driven Fan Control</p>
+    </div>
+    <div class="brand-status">
+      <span class="status"><span class="dot" id="dot"></span><span id="statusTxt">idle</span></span>
+      <span class="muted" id="chassisLabel"></span>
+    </div>
+  </header>
+
+  <!-- ===== Capability strip — scoped to THIS demo (Pi Click + sensor board) ===== -->
+  <div class="capabilities">
+    <div class="cap">
+      <svg viewBox="0 0 24 24" class="cap-ic"><path d="M14 14.76V5a2 2 0 1 0-4 0v9.76a4 4 0 1 0 4 0Z"/></svg>
+      <span>Thermal<br>Monitoring</span>
+    </div>
+    <div class="cap">
+      <svg viewBox="0 0 24 24" class="cap-ic"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>
+      <span>Temperature-Driven<br>Fan Control</span>
+    </div>
+    <div class="cap">
+      <svg viewBox="0 0 24 24" class="cap-ic"><rect x="7" y="7" width="10" height="10" rx="1.5"/><path d="M10 7V4M14 7V4M10 20v-3M14 20v-3M7 10H4M7 14H4M20 10h-3M20 14h-3"/></svg>
+      <span>Sensor<br>Aggregation</span>
+    </div>
+    <div class="cap">
+      <svg viewBox="0 0 24 24" class="cap-ic"><path d="M5 18a8 8 0 1 1 14 0"/><path d="M12 14l4-3.5"/><circle cx="12" cy="14" r="1"/></svg>
+      <span>Redfish<br>Management</span>
+    </div>
+  </div>
+
+  <!-- ===== Console frame ===== -->
+  <section class="console">
+    <div class="console-head">
+      <span class="console-title">Redfish Dashboard</span>
+      <div class="console-tools">
+        <label class="muted" for="bmc">BMC</label>
+        <input id="bmc" size="16" placeholder="(same origin)" />
+        <label class="muted" for="interval">poll&nbsp;ms</label>
+        <input id="interval" size="5" value="2000" />
+        <button id="apply">Apply</button>
+      </div>
+    </div>
+
+    <div class="console-body">
+      <!-- topology -->
+      <aside class="topology">
+        <div class="panel-label">System Topology</div>
+        <div class="topo-list" id="topoList">
+          <div class="topo-node head">
+            <svg viewBox="0 0 24 24" class="ni"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg>
+            <div class="topo-meta"><span class="tn">BMC Manager</span><span class="ts" id="bmcModel">&mdash;</span></div>
+            <span class="dot ok" id="topoDot"></span>
+          </div>
+          <div class="topo-node">
+            <svg viewBox="0 0 24 24" class="ni"><path d="M14 14.8V5a2 2 0 1 0-4 0v9.8a3.5 3.5 0 1 0 4 0Z"/></svg>
+            <div class="topo-meta"><span class="tn">Temp Sensor</span><span class="ts">THERMO 10 / P3T1755 · I2C/I3C</span></div>
+            <span class="dot pending" id="dot-temp"></span>
+          </div>
+          <div class="topo-node">
+            <svg viewBox="0 0 24 24" class="ni"><path d="M13 3 5 13h5l-1 8 8-11h-5l1-7Z"/></svg>
+            <div class="topo-meta"><span class="tn">Power Meter</span><span class="ts">CURRENT 12 / TSC1641 · I2C/I3C</span></div>
+            <span class="dot pending" id="dot-power"></span>
+          </div>
+          <div class="topo-node">
+            <svg viewBox="0 0 24 24" class="ni"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>
+            <div class="topo-meta"><span class="tn">Accelerometer</span><span class="ts">ACCEL 23 / IIS2DULPX · I2C/SPI</span></div>
+            <span class="dot pending" id="dot-accel"></span>
+          </div>
+          <div class="topo-node">
+            <svg viewBox="0 0 24 24" class="ni"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="1.6"/><path d="M12 4v3.5M12 16.5V20M4 12h3.5M16.5 12H20"/></svg>
+            <div class="topo-meta"><span class="tn">Fan + Tach</span><span class="ts">X-FAN 40 / 4-wire · PWM</span></div>
+            <span class="dot pending" id="dot-fan"></span>
+          </div>
+          <div class="topo-node">
+            <svg viewBox="0 0 24 24" class="ni"><path d="M12 3s5 4 5 9a5 5 0 0 1-10 0c0-2 1-3.5 2.5-4.5C9 9 11 7 12 3Z"/></svg>
+            <div class="topo-meta"><span class="tn">Heater + Slider</span><span class="ts">QT Py · UART</span></div>
+            <span class="dot pending" id="dot-heater"></span>
+          </div>
+          <div class="topo-node">
+            <svg viewBox="0 0 24 24" class="ni"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M8 9h8M8 12h8M8 15h5"/></svg>
+            <div class="topo-meta"><span class="tn">ID EEPROM</span><span class="ts" id="eepromInfo">CAT24C32 · I2C1</span></div>
+            <span class="dot pending" id="dot-eeprom"></span>
+          </div>
+        </div>
+        <div class="topo-legend">
+          <span><span class="dot ok"></span>detected</span>
+          <span><span class="dot bad"></span>not detected</span>
+        </div>
+      </aside>
+
+      <!-- telemetry -->
+      <div class="telemetry">
+        <div class="panel-label">Telemetry Overview</div>
+        <div id="sensorSections"></div>
+        <p class="muted" id="emptyHint">
+          No Redfish sensors discovered yet. Check the BMC URL / login, or that
+          entity-manager + dbus-sensors are publishing sensors.
+        </p>
+        <div id="error" class="err"></div>
+      </div>
+
+      <!-- capability sidebar -->
+      <aside class="sidebar">
+        <h2 class="side-head">Temperature-Driven Control.<br>FPGA-Based Fan I/O.<br>Standards-Based Management.</h2>
+        <ul class="checklist">
+          <li>Temperature-driven fan control (swampd)</li>
+          <li>Failsafe fan policy on sensor loss</li>
+          <li>Multi-protocol sensor aggregation (I2C/I3C/SPI/UART)</li>
+          <li>Redfish remote telemetry &amp; control</li>
+        </ul>
+      </aside>
+    </div>
+
+    <!-- event log -->
+    <div class="eventlog">
+      <div class="panel-label">Event Log</div>
+      <div class="log-list" id="eventLog"></div>
+    </div>
+  </section>
+
+  <footer class="page-foot muted">
+    Agilex&nbsp;3E OpenBMC demo · live Redfish telemetry · auto-refreshing
+  </footer>
+</div>
+
+<script src="/dashboard/chart.umd.min.js"></script>
+<script src="/dashboard/dashboard.js"></script>
+</body>
+</html>

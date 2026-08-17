@@ -1,0 +1,72 @@
+{
+    "sensors": [
+        {
+            "name": "Fan_Ctrl",
+            "type": "fan",
+            "readPath": "/xyz/openbmc_project/sensors/fan_tach/Fan_Ctrl",
+            "writePath": "/sys/devices/platform/soc@0/20000000.axi-fan-control/hwmon/**/pwm1",
+            "min": 0,
+            "max": 255
+        },
+        {
+            "name": "Board_Temp",
+            "type": "temp",
+            "readPath": "/xyz/openbmc_project/sensors/temperature/Board_Temp",
+            "timeout": 0
+        }
+    ],
+    "zones": [
+        {
+            "id": 0,
+            "minThermalOutput": 40.0,
+            "failsafePercent": 100.0,
+            "pids": [
+                {
+                    "name": "Board_Temp",
+                    "type": "stepwise",
+                    "inputs": ["Board_Temp"],
+                    "setpoint": 40.0,
+                    "pid": {
+                        "samplePeriod": 1.0,
+                        "positiveHysteresis": 1.0,
+                        "negativeHysteresis": 2.0,
+                        "isCeiling": false,
+                        "reading": {
+                            "0": 25.0,
+                            "1": 30.0,
+                            "2": 35.0,
+                            "3": 40.0,
+                            "4": 45.0
+                        },
+                        "output": {
+                            "0": 40.0,
+                            "1": 50.0,
+                            "2": 60.0,
+                            "3": 80.0,
+                            "4": 100.0
+                        }
+                    }
+                },
+                {
+                    "name": "Fan_Ctrl",
+                    "type": "fan",
+                    "inputs": ["Fan_Ctrl"],
+                    "setpoint": 0.0,
+                    "pid": {
+                        "samplePeriod": 1.0,
+                        "proportionalCoeff": 0.0,
+                        "integralCoeff": 0.0,
+                        "feedFwdOffsetCoeff": 0.0,
+                        "feedFwdGainCoeff": 1.0,
+                        "integralLimit_min": 0.0,
+                        "integralLimit_max": 100.0,
+                        "outLim_min": 0.0,
+                        "outLim_max": 100.0,
+                        "slewNeg": 0.0,
+                        "slewPos": 0.0
+                    }
+                }
+            ]
+        }
+    ]
+}

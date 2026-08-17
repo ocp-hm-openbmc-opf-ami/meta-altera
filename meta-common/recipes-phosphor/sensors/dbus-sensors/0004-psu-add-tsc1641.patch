@@ -1,0 +1,24 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Altera BMC <openbmc@altera.com>
+Date: Thu, 30 Jul 2026 03:24:51 +0000
+Subject: [PATCH 4/4] psu: add TSC1641 power sensor
+
+---
+ src/psu/PSUSensorMain.cpp | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/psu/PSUSensorMain.cpp b/src/psu/PSUSensorMain.cpp
+index ddf39fa..1ceb631 100644
+--- a/src/psu/PSUSensorMain.cpp
++++ b/src/psu/PSUSensorMain.cpp
+@@ -152,6 +152,7 @@ static const I2CDeviceTypeMap sensorTypes{
+     {"XDP710", I2CDeviceType{"xdp710", true}},
+     {"XDPE11280", I2CDeviceType{"xdpe11280", true}},
+     {"XDPE12284", I2CDeviceType{"xdpe12284", true}},
++    {"TSC1641", I2CDeviceType{"tsc1641", true}},
+     {"XDPE152C4", I2CDeviceType{"xdpe152c4", true}},
+ };
+ 
+-- 
+2.34.1
+

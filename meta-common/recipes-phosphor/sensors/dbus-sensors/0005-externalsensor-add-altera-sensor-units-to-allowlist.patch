@@ -1,0 +1,39 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Karunai (AMI Team) <karunaiarasu@ami.com>
+Date: Mon, 28 Jul 2026 00:00:00 +0000
+Subject: [PATCH] SensorPaths: add PercentRH humidity mapping
+
+AMI's dbus-sensors getPathForUnits() doesn't map PercentRH to
+the humidity sensor namespace, causing externalsensor to reject
+Altera's IIS2DULPX vibration and QT Py slider sensors.
+
+Add PercentRH -> "humidity" mapping so these sensors work.
+
+Error without this patch:
+  terminate called after throwing an instance of 'std::runtime_error'
+    what():  Units not in allow list
+
+Note: Volts, Amperes, and Watts are already supported in AMI's fork.
+
+Signed-off-by: Karunai (AMI Team) <karunaiarasu@ami.com>
+---
+ src/SensorPaths.cpp | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/src/SensorPaths.cpp b/src/SensorPaths.cpp
+index 1111111..2222222 100644
+--- a/src/SensorPaths.cpp
++++ b/src/SensorPaths.cpp
+@@ -43,6 +43,10 @@ std::string getPathForUnits(const std::string& units)
+     if (units == "Percent" || units == unitPercent)
+     {
+         return "utilization";
++    }
++    if (units == "PercentRH" || units == unitPercentRH)
++    {
++        return "humidity";
+     }
+     if (units == "Pascals" || units == unitPascals)
+     {
+-- 
+2.34.1

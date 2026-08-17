@@ -1,0 +1,17 @@
+[Unit]
+Description=QT Py UART telemetry bridge (Altera sensor board, slider/knob)
+# Bring-up/demo daemon: reads line-based telemetry from the sensor board's QT Py
+# over the Pi-header UART (/dev/ttyS1 = HPS UART1) and publishes
+# /run/qtpy/heater.json. Safe to enable before the board exists — it just blocks
+# waiting for bytes (use a Raspberry Pi on ttyS1 to emulate the QT Py).
+After=basic.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/qtpy-uart-bridge
+RuntimeDirectory=qtpy
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

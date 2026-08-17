@@ -1,0 +1,9 @@
+LIC_FILES_CHKSUM = "file://COPYING;md5=6bc538ed5bd9a7fc9398086aedcd7e46"
+
+LINUX_VERSION ?= "6.6.51"
+LINUX_VERSION_SUFFIX ?= "-lts"
+LINUX_SRCREV ?= "0447da78ed3ce46dba154ac6db3a61864dc7a589"
+
+SRCREV = "${LINUX_SRCREV}"
+
+include linux-socfpga.inc

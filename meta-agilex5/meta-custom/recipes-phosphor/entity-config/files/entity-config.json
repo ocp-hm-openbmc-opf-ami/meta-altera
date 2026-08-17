@@ -1,0 +1,153 @@
+{
+    "Exposes": [
+        {
+            "Name": "Agilex 5 BMC",
+            "Type": "BMC",
+            "xyz.openbmc_project.Inventory.Decorator.Asset": {
+                "Manufacturer": "Altera",
+                "Model": "Agilex 5 HPS (Cortex-A55)",
+                "PartNumber": "DK-A5E013B",
+                "SerialNumber": "Unknown"
+            }
+        },
+        {
+            "Name": "Agilex 5 System",
+            "Type": "System",
+            "xyz.openbmc_project.Inventory.Decorator.Asset": {
+                "Manufacturer": "Altera",
+                "Model": "DK-A5E013B-M16AEA",
+                "PartNumber": "DK-A5E013B",
+                "SerialNumber": "Unknown"
+            }
+        },
+        {
+            "Address": 0,
+            "Bus": 65535,
+            "Name": "SDM_Temp",
+            "Name1": "XCVR_BotLeft_Temp",
+            "Name2": "XCVR_BotRight_Temp",
+            "Name3": "XCVR_TopRight_Temp",
+            "Type": "SOC64Hwmon"
+        },
+        {
+            "Index": 0,
+            "Name": "Fan_Ctrl",
+            "Type": "AspeedFan",
+            "Connector": {
+                "Pwm": 0,
+                "PwmName": "Fan_Ctrl_PWM"
+            },
+            "MinReadingRpm": 0,
+            "MaxReadingRpm": 5000
+        },
+        {
+            "Name": "Board_Temp",
+            "Type": "ExternalSensor",
+            "Units": "DegreesC",
+            "MinValue": -40,
+            "MaxValue": 125,
+            "Timeout": 30,
+            "PowerState": "Always"
+        },
+        {
+            "Name": "Heater_Supply_Voltage",
+            "Type": "ExternalSensor",
+            "Units": "Volts",
+            "MinValue": 0,
+            "MaxValue": 60,
+            "Timeout": 30,
+            "PowerState": "Always"
+        },
+        {
+            "Name": "Heater_Current",
+            "Type": "ExternalSensor",
+            "Units": "Amperes",
+            "MinValue": -20,
+            "MaxValue": 20,
+            "Timeout": 30,
+            "PowerState": "Always"
+        },
+        {
+            "Name": "Heater_Power",
+            "Type": "ExternalSensor",
+            "Units": "Watts",
+            "MinValue": 0,
+            "MaxValue": 100,
+            "Timeout": 30,
+            "PowerState": "Always"
+        },
+        {
+            "Name": "Heater_Power_Meter_Temp",
+            "Type": "ExternalSensor",
+            "Units": "DegreesC",
+            "MinValue": -40,
+            "MaxValue": 125,
+            "Timeout": 30,
+            "PowerState": "Always"
+        },
+        {
+            "Name": "Fan_Supply_Voltage",
+            "Type": "ExternalSensor",
+            "Units": "Volts",
+            "MinValue": 0,
+            "MaxValue": 60,
+            "Timeout": 30,
+            "PowerState": "Always"
+        },
+        {
+            "Name": "Fan_Current",
+            "Type": "ExternalSensor",
+            "Units": "Amperes",
+            "MinValue": -20,
+            "MaxValue": 20,
+            "Timeout": 30,
+            "PowerState": "Always"
+        },
+        {
+            "Name": "Fan_Power",
+            "Type": "ExternalSensor",
+            "Units": "Watts",
+            "MinValue": 0,
+            "MaxValue": 100,
+            "Timeout": 30,
+            "PowerState": "Always"
+        },
+        {
+            "Name": "Fan_Power_Meter_Temp",
+            "Type": "ExternalSensor",
+            "Units": "DegreesC",
+            "MinValue": -40,
+            "MaxValue": 125,
+            "Timeout": 30,
+            "PowerState": "Always"
+        },
+        {
+            "Name": "Slider",
+            "Type": "ExternalSensor",
+            "Units": "PercentRH",
+            "MinValue": 0,
+            "MaxValue": 100,
+            "Timeout": 15,
+            "PowerState": "Always"
+        },
+        {
+            "Name": "Fan_Vibration",
+            "Type": "ExternalSensor",
+            "Units": "PercentRH",
+            "MinValue": 0,
+            "MaxValue": 100,
+            "Timeout": 15,
+            "PowerState": "Always"
+        }
+    ],
+    "Name": "Agilex5E135B",
+    "Probe": "TRUE",
+    "Type": "Chassis",
+    "xyz.openbmc_project.Inventory.Decorator.Asset": {
+        "Manufacturer": "Altera",
+        "Model": "DK-A5E013B-M16AEA",
+        "PartNumber": "DK-A5E013B",
+        "SerialNumber": "Unknown"
+    },
+    "xyz.openbmc_project.Inventory.Item.Board": {}
+}

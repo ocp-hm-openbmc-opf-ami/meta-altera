@@ -1,0 +1,52 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Altera BMC <openbmc@altera.com>
+Date: Thu, 30 Jul 2026 03:24:29 +0000
+Subject: [PATCH 1/4] hwmon-temp: support soc64-hwmon platform device
+
+---
+ src/hwmon-temp/HwmonTempMain.cpp | 15 +++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
+
+diff --git a/src/hwmon-temp/HwmonTempMain.cpp b/src/hwmon-temp/HwmonTempMain.cpp
+index 5bc3fac..e687694 100644
+--- a/src/hwmon-temp/HwmonTempMain.cpp
++++ b/src/hwmon-temp/HwmonTempMain.cpp
+@@ -44,6 +44,7 @@
+ #include <functional>
+ #include <ios>
+ #include <iostream>
++#include <fstream>
+ #include <memory>
+ #include <optional>
+ #include <regex>
+@@ -88,6 +89,7 @@ static const I2CDeviceTypeMap sensorTypes{
+     {"PT5161L", I2CDeviceType{"pt5161l", true}},
+     {"SBTSI", I2CDeviceType{"sbtsi", true}},
+     {"SBRMI", I2CDeviceType{"sbrmi", true}},
++    {"SOC64Hwmon", I2CDeviceType{"soc64hwmon", false}},
+     {"SI7020", I2CDeviceType{"si7020", false}},
+     {"TMP100", I2CDeviceType{"tmp100", true}},
+     {"TMP1075", I2CDeviceType{"tmp1075", true}},
+@@ -398,7 +400,18 @@ void createSensors(
+                 uint64_t addr = 0;
+                 if (!getDeviceBusAddr(deviceName, bus, addr))
+                 {
+-                    continue;
++                    // Platform hwmon devices have no I2C bus/addr.
++                    // soc64-hwmon is one such device.
++                    std::ifstream nameFile(directory / "name");
++                    std::string hwmonDevName;
++                    if (!nameFile.good() ||
++                        !std::getline(nameFile, hwmonDevName) ||
++                        hwmonDevName != "soc64hwmon")
++                    {
++                        continue;
++                    }
++                    bus = 65535;
++                    addr = 0;
+                 }
+ 
+                 auto thisSensorParameters = getSensorParameters(path);
+-- 
+2.34.1
+

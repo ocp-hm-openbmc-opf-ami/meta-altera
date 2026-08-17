@@ -1,0 +1,22 @@
+From 1111111111111111111111111111111111111111 Mon Sep 17 00:00:00 2001
+From: OpenBMC Integration <noreply@example.com>
+Date: Tue, 8 Jul 2026 00:00:00 +0000
+Subject: [PATCH] templateconf: use meta-phosphor default template
+
+The CE-AMI OpenBMC tree does not provide meta-poky at repository root.
+Point TEMPLATECONF to meta-phosphor's default template so oe-init-build-env
+can initialize the build directory.
+---
+ poky/.templateconf | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/poky/.templateconf b/poky/.templateconf
+index b9b9e04..e249415 100644
+--- a/poky/.templateconf
++++ b/poky/.templateconf
+@@ -1,2 +1,2 @@
+ # Template settings
+-TEMPLATECONF=${TEMPLATECONF:-meta-poky/conf/templates/default}
++TEMPLATECONF=${TEMPLATECONF:-meta-phosphor/conf/templates/default}
+-- 
+2.34.1
