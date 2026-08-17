@@ -37,7 +37,7 @@ sudo dnf install git python3 gcc g++ gawk which bzip2 chrpath cpio \
 git clone --branch CE-AMI202607 https://github.com/ocp-hm-openbmc-opf-ami/openbmc openbmc; cd openbmc
 git clone --branch CE-AMI202607 https://github.com/ocp-hm-openbmc-opf-ami/meta-core
 git clone --branch CE-AMI202607 https://github.com/ocp-hm-openbmc-opf-ami/meta-ami
-git clone --branch Agilex3_Agilex5_support https://github.com/ocp-hm-openbmc-opf-ami/meta-altera.git
+git clone https://github.com/ocp-hm-openbmc-opf-ami/meta-altera.git
 
 meta-ami/github-gitlab-url.sh
 
@@ -51,7 +51,7 @@ bitbake obmc-phosphor-image
 git clone --branch CE-AMI202607 https://github.com/ocp-hm-openbmc-opf-ami/openbmc openbmc; cd openbmc
 git clone --branch CE-AMI202607 https://github.com/ocp-hm-openbmc-opf-ami/meta-core
 git clone --branch CE-AMI202607 https://github.com/ocp-hm-openbmc-opf-ami/meta-ami
-git clone --branch Agilex3_Agilex5_support https://github.com/ocp-hm-openbmc-opf-ami/meta-altera.git
+git clone https://github.com/ocp-hm-openbmc-opf-ami/meta-altera.git
 
 meta-ami/github-gitlab-url.sh
 
