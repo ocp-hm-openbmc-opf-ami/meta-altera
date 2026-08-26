@@ -15,7 +15,6 @@ S = "${UNPACKDIR}"
 # BitBake in this environment rejects variable-containing cleandirs entries.
 
 SRC_URI = " \
-    file://entity-config.json \
     file://axi-fan-control-modprobe.service \
     "
 
