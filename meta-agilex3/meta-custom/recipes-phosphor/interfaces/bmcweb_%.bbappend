@@ -18,8 +18,8 @@ PACKAGECONFIG:remove = "mutual-tls-auth"
 # SIGSEGV on startup on Agilex3 (confirmed via coredump). This matches
 # the commit used by the working Agilex5 OT reference build.
 # Note: the same approach is used in the Agilex5 OT meta-ami bbappend.
-SRC_URI = "git://git.ami.com/core/ami-bmc/one-tree/core/bmcweb;branch=master;protocol=https;name=override;"
-SRCREV_override = "e56730cf2bfdb21ae5bc51b3774f8693fd9297c4"
+#SRC_URI = "git://git.ami.com/core/ami-bmc/one-tree/core/bmcweb;branch=master;protocol=https;name=override;"
+#SRCREV_override = "e56730cf2bfdb21ae5bc51b3774f8693fd9297c4"
 
 # Install a systemd drop-in that orders bmcweb.service AFTER
 # phosphor-certificate-manager@bmcweb.service so that the TLS server
