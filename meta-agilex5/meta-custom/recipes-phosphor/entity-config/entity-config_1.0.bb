@@ -1,4 +1,4 @@
-SUMMARY = "entity-manager chassis configuration for Altera SoCFPGA"
+SUMMARY = "entity-manager chassis configuration for Agilex 5"
 DESCRIPTION = "Provides a static entity-manager configuration that publishes \
 a Chassis inventory object on D-Bus so bmcweb can serve the chassis under \
 /redfish/v1/Chassis and its Sensors collection. \
@@ -15,6 +15,7 @@ S = "${UNPACKDIR}"
 # BitBake in this environment rejects variable-containing cleandirs entries.
 
 SRC_URI = " \
+    file://entity-config.json \
     file://axi-fan-control-modprobe.service \
     "
 
